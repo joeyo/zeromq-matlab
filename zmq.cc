@@ -41,6 +41,9 @@ static int initialized = 0;
 mwSize ret_sz[]={1};
 char* recv_buffer;
 
+/* for zmq verion */
+int major, minor, patch;
+
 /* Cleaning up the data */
 void cleanup( void ){
 	free( recv_buffer );
@@ -54,6 +57,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]) {
 
 	/* First run will initialize the context */
 	if (!initialized) {
+		zmq_version(&major, &minor, &patch);
+		mexPrintf("ZMQMEX: using library version %d.%d.%d\n", major, minor, patch);
 		mexPrintf("ZMQMEX: creating a 1 thread ZMQ context.\n");
 		recv_buffer = (char*) malloc( BUFLEN );
 		ctx = zmq_init(1);
