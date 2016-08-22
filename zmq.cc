@@ -59,9 +59,13 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]) {
 	if (!initialized) {
 		zmq_version(&major, &minor, &patch);
 		mexPrintf("ZMQMEX: using library version %d.%d.%d\n", major, minor, patch);
+
+		if ((ctx = zmq_init(1)) == NULL) {
+			mexErrMsgTxt("Could not create zmq context!");
+		}
 		mexPrintf("ZMQMEX: creating a 1 thread ZMQ context.\n");
+
 		recv_buffer = (char*) malloc( BUFLEN );
-		ctx = zmq_init(1);
 		initialized = 1;
 		/* 'clear all' and 'clear mex' calls this function */
 		mexAtExit(cleanup);
