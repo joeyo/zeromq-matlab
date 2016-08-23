@@ -31,7 +31,7 @@ void * ctx;
 void * sockets[MAX_SOCKETS];
 zmq_pollitem_t poll_items [MAX_SOCKETS];
 uint8_t socket_cnt = 0, socket_id;
-int result, rc;
+int rc;
 static int initialized = 0;
 char* recv_buffer;
 
