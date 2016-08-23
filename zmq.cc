@@ -27,9 +27,8 @@ double* port_ptr;
 char zmq_channel[200];
 void * ctx;
 void * sockets[MAX_SOCKETS];
-zmq_pollitem_t poll_items [MAX_SOCKETS];
+zmq_pollitem_t poll_items[MAX_SOCKETS];
 uint8_t socket_cnt = 0;
-int rc;
 static int initialized = 0;
 
 /* Cleaning up the data */
@@ -92,8 +91,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]) {
 			mexPrintf("ZMQMEX: Binding to {%s}.\n", zmq_channel);
 			if( (sockets[socket_cnt]=zmq_socket(ctx, ZMQ_PUB))==NULL)
 				mexErrMsgTxt("Could not create socket!");
-			rc = zmq_bind( sockets[socket_cnt], zmq_channel );
-			if(rc!=0)
+			if (zmq_bind( sockets[socket_cnt], zmq_channel ) != 0)
 				mexErrMsgTxt("Could not bind to socket!");
 		} else if( strcmp(protocol, "tcp")==0 ) {
 			if (nrhs!=3 || !(port_ptr=(double*)mxGetData(prhs[2])))
@@ -102,8 +100,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]) {
 			mexPrintf("ZMQMEX: Binding to {%s}.\n", zmq_channel);
 			if( (sockets[socket_cnt]=zmq_socket(ctx, ZMQ_PUB))==NULL)
 				mexErrMsgTxt("Could not create socket!");
-			rc = zmq_bind( sockets[socket_cnt], zmq_channel );
-			if(rc!=0)
+			if (zmq_bind( sockets[socket_cnt], zmq_channel ) != 0)
 				mexErrMsgTxt("Could not bind to socket!");
 		} else if( strcmp(protocol, "pgm")==0  ) {
 			if( nrhs<3 || !(channel=mxArrayToString(prhs[2])) )
@@ -116,8 +113,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]) {
 			mexPrintf("ZMQMEX: Connecting to {%s}.\n", zmq_channel);
 			if( (sockets[socket_cnt]=zmq_socket(ctx, ZMQ_PUB))==NULL)
 				mexErrMsgTxt("Could not create socket!");
-			rc = zmq_bind( sockets[socket_cnt], zmq_channel );
-			if(rc!=0)
+			if (zmq_bind( sockets[socket_cnt], zmq_channel ) != 0)
 				mexErrMsgTxt("Could not bind to socket!");
 		}
 
@@ -157,8 +153,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]) {
 			if( (sockets[socket_cnt]=zmq_socket(ctx, ZMQ_SUB))==NULL)
 				mexErrMsgTxt("Could not create socket!");
 			zmq_setsockopt( sockets[socket_cnt], ZMQ_SUBSCRIBE, "", 0 );
-			rc=zmq_connect( sockets[socket_cnt], zmq_channel );
-			if(rc!=0)
+			if (zmq_connect( sockets[socket_cnt], zmq_channel ) != 0)
 				mexErrMsgTxt("Could not connect to socket!");
 
 		} else if( strcmp(protocol, "tcp")==0 ) {
@@ -170,8 +165,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]) {
 			if( (sockets[socket_cnt]=zmq_socket(ctx, ZMQ_SUB))==NULL)
 				mexErrMsgTxt("Could not create socket!");
 			zmq_setsockopt( sockets[socket_cnt], ZMQ_SUBSCRIBE, "", 0 );
-			rc = zmq_connect( sockets[socket_cnt], zmq_channel );
-			if(rc!=0)
+			if (zmq_connect( sockets[socket_cnt], zmq_channel ) != 0)
 				mexErrMsgTxt("Could not connect to socket!");
 
 		} else if( strcmp(protocol, "pgm")==0  ) {
@@ -185,8 +179,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]) {
 			if( (sockets[socket_cnt]=zmq_socket(ctx, ZMQ_SUB))==NULL)
 				mexErrMsgTxt("Could not create socket!");
 			zmq_setsockopt( sockets[socket_cnt], ZMQ_SUBSCRIBE, "", 0 );
-			rc=zmq_connect( sockets[socket_cnt], zmq_channel );
-			if(rc!=0)
+			if (zmq_connect( sockets[socket_cnt], zmq_channel ) != 0)
 				mexErrMsgTxt("Could not connect to socket!");
 		}
 
@@ -207,25 +200,24 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]) {
 	}
 
 	/* Send data over a socket */
-	else if (strcasecmp(command, "send") == 0){
-		if( nrhs != 3 )
+	else if (strcasecmp(command, "send") == 0) {
+		if (nrhs != 3)
 			mexErrMsgTxt("Please provide a socket id and a message to send");
 		if ( !mxIsClass(prhs[1],"uint8") || mxGetNumberOfElements(prhs[1])!=1 )
 			mexErrMsgTxt("Please provide a valid handle");
 		uint8_t socket_id = *( (uint8_t*)mxGetData(prhs[1]) );
-		if( socket_id>socket_cnt )
-			mexErrMsgTxt("Bad socket id!");
+		if (socket_id > socket_cnt)
+			mexErrMsgTxt("Invalid socket id!");
 
-		size_t n_el = mxGetNumberOfElements(prhs[2]);
-		size_t el_sz = mxGetElementSize(prhs[2]);
-		size_t msglen = n_el*el_sz;
+		size_t msglen = mxGetNumberOfElements(prhs[2])*mxGetElementSize(prhs[2]);
 		/* Get the data and send it  */
 		void* msg = (void*)mxGetData(prhs[2]);
-		int nbytes = zmq_send( sockets[ socket_id ], msg, msglen, 0 );
-		/* Check the outcome of the send */
-		if(nbytes!=msglen)
+		int nbytes = zmq_send(sockets[socket_id], msg, msglen, 0);
+
+		/* Check the integrity of the send */
+		if (nbytes!=msglen)
 			mexErrMsgTxt("Did not send correct number of bytes.");
-		if (nlhs>0) {
+		if (nlhs > 0) {
 			mwSize sz = 1;
 			plhs[0] = mxCreateNumericArray(1, &sz, mxINT32_CLASS, mxREAL);
 			int* out = (int*)mxGetData(plhs[0]);
@@ -299,6 +291,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]) {
 		}
 
 		/* Get the number of objects that have data */
+		int rc;
 		if ( (rc=zmq_poll(poll_items, socket_cnt, mytimeout)) < 0 )
 			mexErrMsgTxt("Poll error!");
 
