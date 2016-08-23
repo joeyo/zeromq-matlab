@@ -233,19 +233,21 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]) {
 		}
 	}
 
-	else if (strcasecmp(command, "receive") == 0){
+	else if (strcasecmp(command, "receive") == 0) {
 		if (nrhs != 2)
 			mexErrMsgTxt("Please provide a socket id.");
-		if ( !mxIsClass(prhs[1],"uint8") || mxGetNumberOfElements( prhs[1] )!=1 )
+		if ( !mxIsClass(prhs[1],"uint8") || mxGetNumberOfElements(prhs[1]) !=1 )
 			mexErrMsgTxt("Please provide a valid handle");
 		uint8_t socket_id = *( (uint8_t*)mxGetData(prhs[1]) );
 		if( socket_id>socket_cnt )
-			mexErrMsgTxt("Bad socket id!");
+			mexErrMsgTxt("Invalid socket id!");
 
 		/* If a file descriptor, then return the fd */
-		if( poll_items[socket_id].socket == NULL ){
-			plhs[0] = mxCreateDoubleScalar( poll_items[socket_id].fd );
-			plhs[1] = mxCreateDoubleScalar( 0 );
+		if (poll_items[socket_id].socket == NULL) {
+			if (nlhs > 0)
+				plhs[0] = mxCreateDoubleScalar(poll_items[socket_id].fd);
+			if (nlhs > 1)
+				plhs[1] = mxCreateDoubleScalar(0);
 			return;
 		}
 
@@ -265,7 +267,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]) {
 		int64_t more;
 		size_t more_size = sizeof(more);
 		if (zmq_getsockopt( sockets[socket_id], ZMQ_RCVMORE,
-				&more, &more_size ) != 0) {
+				&more, &more_size) != 0) {
 			zmq_msg_close(&msg);
 			mexErrMsgTxt("ZMQ_RCVMORE failure!");
 		}
@@ -289,13 +291,15 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]) {
 	/* Poll for data at a specified interval.  Default interval: indefinite */
 	else if (strcasecmp(command, "poll") == 0){
 		long mytimeout = -1;
-		if (nrhs > 1 && mxGetNumberOfElements(prhs[1])==1 ){
-			double* timeout_ptr = (double*)mxGetData(prhs[1]);
-			mytimeout = (long)(timeout_ptr[0]);
+		if (nrhs > 1) {
+			if (mxGetNumberOfElements(prhs[1]) > 0) {
+				double* timeout_ptr = (double*)mxGetData(prhs[1]);
+				mytimeout = (long)(timeout_ptr[0]);
+			}
 		}
+
 		/* Get the number of objects that have data */
-		rc = zmq_poll (poll_items, socket_cnt, mytimeout);
-		if(rc<0)
+		if ( (rc=zmq_poll(poll_items, socket_cnt, mytimeout)) < 0 )
 			mexErrMsgTxt("Poll error!");
 
 		/*
@@ -327,7 +331,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]) {
 		uint32_t fd = *( (uint32_t*)mxGetData(prhs[1]) );
 
 		/* cannot be stdin, stdout or stderr */
-		if( fd<3 )
+		if (fd < 3)
 			mexErrMsgTxt("Bad file descriptor!");
 		poll_items[socket_cnt].socket = NULL;
 		poll_items[socket_cnt].fd = fd;
@@ -340,8 +344,9 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]) {
 		}
 		socket_cnt++;
 	}
-	else
+	else {
 		mexErrMsgTxt("Unrecognized command.");
+	}
 
 	mxFree(command);
 }
