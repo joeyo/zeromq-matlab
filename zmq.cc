@@ -18,7 +18,7 @@
 #include <unistd.h>
 #endif
 
-/* Do not exceed 255 since indexed by uint8_t */
+/* N.B. Do not exceed 255 sockets since indexed by uint8_t */
 #define MAX_SOCKETS 16
 
 char *protocol, *channel;
@@ -125,7 +125,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 		/* poll_items[socket_cnt].events = ZMQ_POLLOUT; */
 
 		/* MATLAB specific return of the socket ID */
-		if (nlhs>0) {
+		if (nlhs > 0) {
 			mwSize sz = 1;
 			plhs[0] = mxCreateNumericArray(1, &sz, mxUINT8_CLASS, mxREAL);
 			uint8_t *out = (uint8_t *)mxGetData(plhs[0]);
@@ -185,14 +185,12 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 				mexErrMsgTxt("Could not connect to socket!");
 		}
 
-
-
 		/* Add the connected socket to the poll items */
 		poll_items[socket_cnt].socket = sockets[socket_cnt];
 		poll_items[socket_cnt].events = ZMQ_POLLIN;
 
 		/* MATLAB specific return of the socket ID */
-		if (nlhs>0) {
+		if (nlhs > 0) {
 			mwSize sz = 1;
 			plhs[0] = mxCreateNumericArray(1, &sz, mxUINT8_CLASS, mxREAL);
 			uint8_t *out = (uint8_t *)mxGetData(plhs[0]);
@@ -211,9 +209,9 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 		if (socket_id > socket_cnt)
 			mexErrMsgTxt("Invalid socket id!");
 
-		size_t msglen = mxGetNumberOfElements(prhs[2])*mxGetElementSize(prhs[2]);
 		/* Get the data and send it  */
 		void *msg = (void *)mxGetData(prhs[2]);
+		size_t msglen = mxGetNumberOfElements(prhs[2])*mxGetElementSize(prhs[2]);
 		int nbytes = zmq_send(sockets[socket_id], msg, msglen, 0);
 
 		/* Check the integrity of the send */
@@ -225,9 +223,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 			int *out = (int *)mxGetData(plhs[0]);
 			out[0] = nbytes;
 		}
-	}
-
-	else if (strcasecmp(command, "receive") == 0) {
+	} else if (strcasecmp(command, "receive") == 0) {
 		if (nrhs != 2)
 			mexErrMsgTxt("Please provide a socket id.");
 		if ( !mxIsClass(prhs[1],"uint8") || mxGetNumberOfElements(prhs[1]) !=1 )
@@ -260,8 +256,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 		/* Check if multipart */
 		int64_t more;
 		size_t more_size = sizeof(more);
-		if (zmq_getsockopt( sockets[socket_id], ZMQ_RCVMORE,
-		                    &more, &more_size) != 0) {
+		if (zmq_getsockopt(sockets[socket_id], ZMQ_RCVMORE,
+		                   &more, &more_size) != 0) {
 			zmq_msg_close(&msg);
 			mexErrMsgTxt("ZMQ_RCVMORE failure!");
 		}
