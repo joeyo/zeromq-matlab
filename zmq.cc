@@ -23,7 +23,7 @@
 /* Do not exceed 255 since indexed by uint8_t */
 #define MAX_SOCKETS 16
 
-char *command, *protocol, *channel;
+char *protocol, *channel;
 double* port_ptr;
 /* Channel name */
 char zmq_channel[200];
@@ -72,6 +72,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]) {
 	/* Should Have a least a few arguments */
 	if (nrhs < 1)
 		mexErrMsgTxt("Usage: zmq('[subscribe|publish|poll|receive]','[ipc|tcp|pgm]','{name|IP}','PORT')");
+
+	char *command;
 
 	/* Grab the command string */
 	if ( !(command = mxArrayToString(prhs[0])) )
@@ -317,4 +319,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]) {
 	}
 	else
 		mexErrMsgTxt("Unrecognized command.");
+
+	mxFree(command);
 }
