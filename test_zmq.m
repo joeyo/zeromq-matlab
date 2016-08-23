@@ -1,47 +1,28 @@
 % (c) 2015 Stephen McGill
+% (c) 2016 Joseph E. O'Doherty
 % MATLAB script to test zeromq-matlab
-clear all;
-TEST_TCP = true;
 
-if ~ispc
-    p1 = zmq( 'publish',   'ipc', 'matlab' );
-    s1 = zmq( 'subscribe', 'ipc', 'matlab' );
-else
-    disp('0MQ IPC not supported on windows. Skipping IPC test...')
-end
+function test_zmq()
 
-data1 = uint8('hello world!')';
-recv_data1 = [];
+    clear all;
 
-disp('Sending data...')
-if ~ispc
-    nbytes1 = zmq( 'send', p1, data1 );
-else
-    nbytes1 = 0;
-end
-
-fprintf('\nSent %d bytes on the ipc channel.\n',nbytes1);
-idx = zmq('poll', 1000);
-
-if(numel(idx)==0)
-	disp('No data!')
-end
-
-for c=1:numel(idx)
-    s_id = idx(c);
-    [recv_data,has_more] = zmq( 'receive', s_id );
-    fprintf('\nI have more? %d\n',has_more);
-	if ~ispc && s_id==s1
-		disp('ipc channel receiving...');
-        recv_data1 = char(recv_data);
-		disp( recv_data1' );
-	end
-end
+    TEST_IPC = true;
+    TEST_TCP = true;
+    TEST_INPROC = true;
 
 if ispc
-    disp('IPC test skipped!')
-else
-    if numel(data1)==numel(recv_data1) && sum(recv_data1==data1)==numel(data1)
+    disp('ZMQ IPC not supported on windows. Skipping IPC test...');
+    TEST_IPC = false;
+end
+
+if TEST_IPC
+    disp('Testing IPC');
+    p1 = zmq( 'publish',   'ipc:///tmp/matlab.zmq' );
+    s1 = zmq( 'subscribe', 'ipc:///tmp/matlab.zmq' );
+
+    if  do_string_test(p1, s1) && ...
+        do_uint8_test(p1, s1) && ...
+        do_double_test(p1, s1)
         disp('IPC PASS');
     else
         disp('IPC FAIL');
@@ -49,27 +30,135 @@ else
 end
 
 if TEST_TCP
-    cnt = 1;
-    disp('Setting up TCP')
-    s2 = zmq( 'subscribe', 'tcp', '127.0.0.1', 43210 );
-    p2 = zmq( 'publish', 'tcp', 43210 );
-    data2 = uint8(sprintf('#%d: %d', cnt, randi(9)));
-    zmq('poll', 1000);
-    nbytes2 = zmq( 'send', p2, data2 );
-    idx = zmq('poll', 1000);
-    [recv_data,has_more] = zmq( 'receive', idx );
-    disp( 'tcp channel receiving...' );
-    recv_data2 = char(recv_data');
-    disp( recv_data2 );
-    
-    if numel(data2)==numel(recv_data2) && sum(recv_data2==data2)==numel(data2)
+    disp('Testing TCP');
+    port = 2048 + randi(255);
+    p1 = zmq( 'publish',   sprintf('tcp://*:%d', port) );
+    s1 = zmq( 'subscribe', sprintf('tcp://127.0.0.1:%d', port) );
+
+    if  do_string_test(p1, s1) && ...
+        do_uint8_test(p1, s1) && ...
+        do_double_test(p1, s1)
         disp('TCP PASS');
     else
         disp('TCP FAIL');
     end
-    clear cnt;
 end
 
-%if ~ispc
-%    exit
-%end
+if TEST_INPROC
+    disp('Testing INPROC');
+    x = randi(255);
+    p1 = zmq( 'publish',   sprintf('inproc://foo-%d', x) );
+    s1 = zmq( 'subscribe', sprintf('inproc://foo-%d', x) );
+
+    if  do_string_test(p1, s1) && ...
+        do_uint8_test(p1, s1) && ...
+        do_double_test(p1, s1)
+        disp('INPROC PASS');
+    else
+        disp('INPROC FAIL');
+    end
+end
+
+if ~ispc
+    quit
+end
+
+end
+
+function outcome = do_string_test(p, s)
+
+    zmq('poll', 1);
+
+    disp('=> string test');
+    str = 'hello world!';
+    d = uint8(str)';
+    n = zmq('send', p, d);
+    fprintf('   Sent "%s" (%d bytes)\n', str, n);
+
+    idx = zmq('poll', 1);
+    if (numel(idx)==0)
+       disp('No data!')
+    end
+
+    outcome = true;
+
+    for i=1:numel(idx)
+        if idx(i) == s
+            [recv_data, has_more] = zmq('recv', idx(i));
+            fprintf('   Recv "%s" (%d bytes)\n', char(recv_data), numel(recv_data));
+            fprintf('   More? %d\n', has_more);
+            if numel(d) ~= numel(recv_data)
+                outcome = false;
+            else
+                if ~all(recv_data==d)
+                    outcome = false;
+                end
+            end
+        end
+    end
+end
+
+function outcome = do_uint8_test(p, s)
+
+    zmq('poll', 1);
+
+    disp('=> uint8 test');
+    d = uint8(randi(255));
+    n = zmq('send', p, d);
+    fprintf('   Sent "%d" (%d bytes)\n', d, n);
+
+    idx = zmq('poll', 1);
+    if (numel(idx)==0)
+       disp('No data!')
+    end
+
+    outcome = true;
+
+    for i=1:numel(idx)
+        if idx(i) == s
+            [recv_data, has_more] = zmq('recv', idx(i));
+            fprintf('   Recv "%d" (%d bytes)\n', recv_data, numel(recv_data));
+            fprintf('   More? %d\n', has_more);
+            if numel(d) ~= numel(recv_data)
+                outcome = false;
+            else
+                if ~all(recv_data==d)
+                    outcome = false;
+                end
+            end
+        end
+    end
+end
+
+function outcome = do_double_test(p, s)
+
+    zmq('poll', 1);
+
+    disp('=> double test');
+    d = randn(1);
+    n = zmq('send', p, d);
+    fprintf('   Sent "%f" (%d bytes)\n', d, n);
+
+    idx = zmq('poll', 1);
+    if (numel(idx)==0)
+       disp('No data!')
+    end
+
+    outcome = true;
+
+    for i=1:numel(idx)
+        if idx(i) == s
+            [recv_data, has_more] = zmq('recv', idx(i));
+            x = typecast(recv_data, 'double');
+            fprintf('   Recv "%f" (%d bytes)\n', x, numel(recv_data));
+            fprintf('   More? %d\n', has_more);
+            if numel(d) ~= numel(x)
+                outcome = false;
+            else
+                if ~all(x==d)
+                    outcome = false;
+                end
+            end
+        end
+    end
+end
