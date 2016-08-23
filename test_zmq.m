@@ -69,7 +69,11 @@ end
 
 function outcome = do_string_test(p, s)
 
+    % for tcp on the localhost, it's necessary to poll once before sending
+    % see: https://github.com/smcgill3/zeromq-matlab/issues/4
     zmq('poll', 1);
+
+    outcome = true;
 
     disp('=> string test');
     str = 'hello world!';
@@ -79,10 +83,9 @@ function outcome = do_string_test(p, s)
 
     idx = zmq('poll', 1);
     if (numel(idx)==0)
-       disp('No data!')
+       disp('No data!');
+       outcome = false;
     end
-
-    outcome = true;
 
     for i=1:numel(idx)
         if idx(i) == s
@@ -102,7 +105,11 @@ end
 
 function outcome = do_uint8_test(p, s)
 
+    % for tcp on the localhost, it's necessary to poll once before sending
+    % see: https://github.com/smcgill3/zeromq-matlab/issues/4
     zmq('poll', 1);
+
+    outcome = true;
 
     disp('=> uint8 test');
     d = uint8(randi(255));
@@ -112,9 +119,8 @@ function outcome = do_uint8_test(p, s)
     idx = zmq('poll', 1);
     if (numel(idx)==0)
        disp('No data!')
+       outcome = false;
     end
-
-    outcome = true;
 
     for i=1:numel(idx)
         if idx(i) == s
@@ -134,7 +140,11 @@ end
 
 function outcome = do_double_test(p, s)
 
+    % for tcp on the localhost, it's necessary to poll once before sending
+    % see: https://github.com/smcgill3/zeromq-matlab/issues/4
     zmq('poll', 1);
+
+    outcome = true;
 
     disp('=> double test');
     d = randn(1);
@@ -143,10 +153,9 @@ function outcome = do_double_test(p, s)
 
     idx = zmq('poll', 1);
     if (numel(idx)==0)
-       disp('No data!')
+       disp('No data!');
+       outcome = false;
     end
-
-    outcome = true;
 
     for i=1:numel(idx)
         if idx(i) == s

@@ -1,23 +1,36 @@
-zeromq-matlab
-=============
+# zeromq-matlab
 
-ZeroMQ mex bindings for MATLAB.  This version is known to work with ZeroMQ 3.2.2 on Mac OSX 10.8.3 with MATLAB 2012b and on Ubuntu 12.04 with MATLAB 2013a.
+[ZeroMQ] mex bindings for MATLAB. This version is known to work with:
 
-Tested with ZeroMQ 4.0.5 on MATLAB R2015a. TCP needs two different hosts.
+* ZMQ 4.0.8 on Debian 8 with MATLAB 2016a.
+* ZMQ 4.1.5 on Mac OS X 10.11.6 with MATLAB 2016a.
 
-Requires ZeroMQ to be installed first (see below)
+## Dependencies
 
-To build, run "make"
+Requires ZeroMQ, naturally. Try `sudo apt-get install libzmq3-dev`,
+`brew install zeromq` or similar.
 
-To test, run "make test" if MATLAB can be called from the commandline.
+## Installation
 
+To build, run `make`.
+To test, run `make test` if MATLAB can be called from the command line.
 
-Installing ZeroMQ 3.2.2 on Ubuntu 12.04
-=======================
-Download the tarball from http://www.zeromq.org/intro:get-the-software
-In the root of the extracted archive, run the following commands:
+## API Examples
 
-1. ./configure
-2. make
-3. sudo make install
-4. sudo ldconfig
+```matlab
+p = zmq('publish', 'tcp://*:1337');
+s = zmq('subscribe', 'tcp://127.0.0.1:1337');
+
+% for tcp on the localhost, it's necessary to poll once before sending anything
+% see: https://github.com/smcgill3/zeromq-matlab/issues/4
+zmq('poll', 1); % 1 msec
+
+while 1
+    nbytes_sent = zmq('send', p, uint8('hello world!')');
+    id = zmq('poll', -1); % block
+    [data, has_more] = zmq('recv', id(1));
+    fprintf('%s\n', char(data'));
+end
+```
+
+[ZeroMQ]: http://zeromq.org/
