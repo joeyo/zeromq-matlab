@@ -30,7 +30,7 @@ char zmq_channel[200];
 void * ctx;
 void * sockets[MAX_SOCKETS];
 zmq_pollitem_t poll_items [MAX_SOCKETS];
-uint8_t socket_cnt = 0, socket_id;
+uint8_t socket_cnt = 0;
 int rc;
 static int initialized = 0;
 char* recv_buffer;
@@ -217,12 +217,12 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]) {
 			mexErrMsgTxt("Please provide a socket id and a message to send");
 		if ( !mxIsClass(prhs[1],"uint8") || mxGetNumberOfElements(prhs[1])!=1 )
 			mexErrMsgTxt("Please provide a valid handle");
-		socket_id = *( (uint8_t*)mxGetData(prhs[1]) );
+		uint8_t socket_id = *( (uint8_t*)mxGetData(prhs[1]) );
 		if( socket_id>socket_cnt )
 			mexErrMsgTxt("Bad socket id!");
 
 		size_t n_el = mxGetNumberOfElements(prhs[2]);
-		size_t el_sz = mxGetElementSize(prhs[2]);		
+		size_t el_sz = mxGetElementSize(prhs[2]);
 		size_t msglen = n_el*el_sz;
 		/* Get the data and send it  */
 		void* msg = (void*)mxGetData(prhs[2]);
@@ -243,7 +243,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]) {
 			mexErrMsgTxt("Please provide a socket id.");
 		if ( !mxIsClass(prhs[1],"uint8") || mxGetNumberOfElements( prhs[1] )!=1 )
 			mexErrMsgTxt("Please provide a valid handle");
-		socket_id = *( (uint8_t*)mxGetData(prhs[1]) );
+		uint8_t socket_id = *( (uint8_t*)mxGetData(prhs[1]) );
 		if( socket_id>socket_cnt )
 			mexErrMsgTxt("Bad socket id!");
 
