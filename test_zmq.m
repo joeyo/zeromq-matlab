@@ -6,6 +6,8 @@ function test_zmq()
 
     clear all;
 
+	rng('shuffle');
+
     TEST_IPC = true;
     TEST_TCP = true;
     TEST_INPROC = true;
