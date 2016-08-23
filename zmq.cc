@@ -1,6 +1,7 @@
 /*
  * MATLAB mex file to send and receive zmq messages (PUB/SUB)
  * Stephen G. McGill copyright 2015 <smcgill3@seas.upenn.edu>
+ * Joseph E. O'Doherty copyright 2016 <joeyo@phy.ucsf.edu>
  * */
 #include <stdio.h>
 #include <stdint.h>
@@ -21,10 +22,6 @@
 /* N.B. Do not exceed 255 sockets since indexed by uint8_t */
 #define MAX_SOCKETS 16
 
-char *protocol, *channel;
-double *port_ptr;
-/* Channel name */
-char zmq_channel[200];
 void *ctx;
 void *sockets[MAX_SOCKETS];
 zmq_pollitem_t poll_items[MAX_SOCKETS];
@@ -42,7 +39,6 @@ void cleanup( void )
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
-
 	/* First run will initialize the context */
 	if (!initialized) {
 		int major, minor, patch;
@@ -65,61 +61,45 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 	}
 
 	/* Should Have a least a few arguments */
-	if (nrhs < 1)
-		mexErrMsgTxt("Usage: zmq('[subscribe|publish|poll|receive]','[ipc|tcp|pgm]','{name|IP}','PORT')");
+	if (nrhs < 1) {
+        mexPrintf("Usage:\n");
+        mexPrintf(" zmq('publish', [endpoint]')\n");
+        mexPrintf(" zmq('subscribe', [endpoint]')\n");
+        mexPrintf(" zmq('poll', [timeout])\n");
+        mexPrintf(" zmq('send', [socket_id], [msg])\n");
+        mexPrintf(" zmq('recv', [socket_id])\n");
+        mexPrintf(" zmq('fd', [fd])\n");
+		return;
+	}
 
 	char *command;
 
 	/* Grab the command string */
 	if ( !(command = mxArrayToString(prhs[0])) )
-		mexErrMsgTxt("Could not read command string. (1st argument)");
+		mexErrMsgTxt("First argument must be one of: '[publish|subscribe|poll|send|recv|fd]'.");
 
 	/* Setup a publisher */
 	if ( strcmp(command, "publish")==0 ) {
 
-		/* Check that we have enough socket spaces available */
+		/* Check that we have enough sockets available */
 		if ( socket_cnt==MAX_SOCKETS )
-			mexErrMsgTxt("Cannot create any more sockets!");
+			mexErrMsgTxt("Cannot create additional sockets!");
 
-		/* Grab the protocol and channel */
-		if ( !(protocol=mxArrayToString(prhs[1])) )
-			mexErrMsgTxt("Bad protocol string.");
+		/* Grab the endpoint */
+		if (nrhs < 2)
+			mexErrMsgTxt("Usage: zmq('publish', [endpoint])");
+		char *endpoint;
+		if ( !(endpoint=mxArrayToString(prhs[1])) )
+			mexErrMsgTxt("Malformed endpoint string (2nd argument)'.");
 
-		/* Protocol specific channel formation */
-		if ( strcmp(protocol, "ipc")==0 ) {
-			if ( nrhs<3 || !(channel=mxArrayToString(prhs[2])) )
-				mexErrMsgTxt("Bad channel string.");
-			sprintf(zmq_channel, "ipc:///tmp/%s", channel );
-			mexPrintf("ZMQMEX: Binding to {%s}.\n", zmq_channel);
-			if ( (sockets[socket_cnt]=zmq_socket(ctx, ZMQ_PUB))==NULL)
-				mexErrMsgTxt("Could not create socket!");
-			if (zmq_bind( sockets[socket_cnt], zmq_channel ) != 0)
-				mexErrMsgTxt("Could not bind to socket!");
-		} else if ( strcmp(protocol, "tcp")==0 ) {
-			if (nrhs!=3 || !(port_ptr=(double *)mxGetData(prhs[2])))
-				mexErrMsgTxt("Usage: zmq('publish','tcp',PORT)");
-			sprintf(zmq_channel, "tcp://*:%d", (int)port_ptr[0] );
-			mexPrintf("ZMQMEX: Binding to {%s}.\n", zmq_channel);
-			if ( (sockets[socket_cnt]=zmq_socket(ctx, ZMQ_PUB))==NULL)
-				mexErrMsgTxt("Could not create socket!");
-			if (zmq_bind( sockets[socket_cnt], zmq_channel ) != 0)
-				mexErrMsgTxt("Could not bind to socket!");
-		} else if ( strcmp(protocol, "pgm")==0  ) {
-			if ( nrhs<3 || !(channel=mxArrayToString(prhs[2])) )
-				mexErrMsgTxt("Bad channel string.");
-			if ( nrhs!=4 || !(port_ptr=(double *)mxGetData(prhs[3])) )
-				mexErrMsgTxt("Usage: zmq('subscribe','pgm',multicast_address,port)");
-			/* http://en.wikipedia.org/wiki/Multicast_address */
-			/* Channel should be 224.0.0.1 by default */
-			sprintf(zmq_channel, "pgm://en0;%s:%d", channel, (int)port_ptr[0] );
-			mexPrintf("ZMQMEX: Connecting to {%s}.\n", zmq_channel);
-			if ( (sockets[socket_cnt]=zmq_socket(ctx, ZMQ_PUB))==NULL)
-				mexErrMsgTxt("Could not create socket!");
-			if (zmq_bind( sockets[socket_cnt], zmq_channel ) != 0)
-				mexErrMsgTxt("Could not bind to socket!");
-		}
+		/* Create socket and bind to the endpoint */
+		mexPrintf("ZMQMEX: Binding to %s.\n", endpoint);
+		if ((sockets[socket_cnt]=zmq_socket(ctx, ZMQ_PUB)) == NULL)
+			mexErrMsgTxt("Could not create socket!");
+		if ((zmq_bind(sockets[socket_cnt], endpoint)) != 0)
+			mexErrMsgTxt("Could not bind socket to endpoint!");
 
-		/* Connect to the socket */
+		mxFree(endpoint);
 
 		poll_items[socket_cnt].socket = sockets[socket_cnt];
 		/* poll_items[socket_cnt].events = ZMQ_POLLOUT; */
@@ -139,51 +119,24 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
 		/* Check that we have enough socket spaces available */
 		if ( socket_cnt==MAX_SOCKETS )
-			mexErrMsgTxt("Cannot create any more sockets!");
+			mexErrMsgTxt("Cannot create additional sockets!");
 
-		/* Grab the protocol and channel */
-		if ( !(protocol=mxArrayToString(prhs[1])) )
-			mexErrMsgTxt("Bad protocol string.");
-		if ( nrhs<3 || !(channel=mxArrayToString(prhs[2])) )
-			mexErrMsgTxt("Bad channel string.");
+		/* Grab the endpoint */
+		if (nrhs < 2)
+			mexErrMsgTxt("Usage: zmq('subscribe', [endpoint])");
+		char *endpoint;
+		if ( !(endpoint=mxArrayToString(prhs[1])) )
+			mexErrMsgTxt("Malformed endpoint string (2nd argument)'.");
 
-		/* Protocol specific channel formation */
-		if ( strcmp(protocol, "ipc")==0 ) {
-			sprintf(zmq_channel, "ipc:///tmp/%s", channel );
-			/* Connect to the socket */
-			mexPrintf("ZMQMEX: Connecting to {%s}.\n", zmq_channel);
-			if ( (sockets[socket_cnt]=zmq_socket(ctx, ZMQ_SUB))==NULL)
-				mexErrMsgTxt("Could not create socket!");
-			zmq_setsockopt( sockets[socket_cnt], ZMQ_SUBSCRIBE, "", 0 );
-			if (zmq_connect( sockets[socket_cnt], zmq_channel ) != 0)
-				mexErrMsgTxt("Could not connect to socket!");
+		/* Create socket and connect to the endpoint */
+		mexPrintf("ZMQMEX: Connecting to %s.\n", endpoint);
+		if ((sockets[socket_cnt]=zmq_socket(ctx, ZMQ_SUB))==NULL)
+			mexErrMsgTxt("Could not create socket!");
+		zmq_setsockopt(sockets[socket_cnt], ZMQ_SUBSCRIBE, "", 0);
+		if ( zmq_connect(sockets[socket_cnt], endpoint) != 0 )
+			mexErrMsgTxt("Could not connect socket to endpoint!");
 
-		} else if ( strcmp(protocol, "tcp")==0 ) {
-			if ( nrhs!=4 || !(port_ptr=(double *)mxGetData(prhs[3])) )
-				mexErrMsgTxt("Usage: zmq('subscribe','tcp', 'IP', PORT)");
-			sprintf(zmq_channel, "tcp://%s:%d", channel, (int)port_ptr[0] );
-			/* Connect to the socket */
-			mexPrintf("ZMQMEX: Connecting to {%s}.\n", zmq_channel);
-			if ( (sockets[socket_cnt]=zmq_socket(ctx, ZMQ_SUB))==NULL)
-				mexErrMsgTxt("Could not create socket!");
-			zmq_setsockopt( sockets[socket_cnt], ZMQ_SUBSCRIBE, "", 0 );
-			if (zmq_connect( sockets[socket_cnt], zmq_channel ) != 0)
-				mexErrMsgTxt("Could not connect to socket!");
-
-		} else if ( strcmp(protocol, "pgm")==0  ) {
-			if ( nrhs!=4 || !(port_ptr=(double *)mxGetData(prhs[3])) )
-				mexErrMsgTxt("Usage: zmq('subscribe','pgm',multicast_address,port)");
-			/* http://en.wikipedia.org/wiki/Multicast_address */
-			/* Channel should be 224.0.0.1 by default */
-			sprintf(zmq_channel, "pgm://en0;%s:%d", channel, (int)port_ptr[0] );
-			/* Connect to the socket */
-			mexPrintf("ZMQMEX: Connecting to {%s}.\n", zmq_channel);
-			if ( (sockets[socket_cnt]=zmq_socket(ctx, ZMQ_SUB))==NULL)
-				mexErrMsgTxt("Could not create socket!");
-			zmq_setsockopt( sockets[socket_cnt], ZMQ_SUBSCRIBE, "", 0 );
-			if (zmq_connect( sockets[socket_cnt], zmq_channel ) != 0)
-				mexErrMsgTxt("Could not connect to socket!");
-		}
+		mxFree(endpoint);
 
 		/* Add the connected socket to the poll items */
 		poll_items[socket_cnt].socket = sockets[socket_cnt];
@@ -217,13 +170,14 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 		/* Check the integrity of the send */
 		if (nbytes!=msglen)
 			mexErrMsgTxt("Did not send correct number of bytes.");
+
 		if (nlhs > 0) {
 			mwSize sz = 1;
 			plhs[0] = mxCreateNumericArray(1, &sz, mxINT32_CLASS, mxREAL);
 			int *out = (int *)mxGetData(plhs[0]);
 			out[0] = nbytes;
 		}
-	} else if (strcasecmp(command, "receive") == 0) {
+	} else if (strcasecmp(command, "recv") == 0) {
 		if (nrhs != 2)
 			mexErrMsgTxt("Please provide a socket id.");
 		if ( !mxIsClass(prhs[1],"uint8") || mxGetNumberOfElements(prhs[1]) !=1 )
@@ -247,7 +201,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 		/* Blocking Receive */
 		int nbytes = zmq_msg_recv(&msg, sockets[socket_id], 0);
 		/* Non-blocking Receive */
-		/*int nbytes = zmq_msg_recv(&msg, sockets[socket], ZMQ_DONTWAIT);*/
+		/*int nbytes = zmq_msg_recv(&msg, sockets[socket_id], ZMQ_DONTWAIT);*/
 		if (nbytes==-1) {
 			zmq_msg_close(&msg);
 			mexErrMsgTxt("Receive failure!");
@@ -324,6 +278,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 		/* cannot be stdin, stdout or stderr */
 		if (fd < 3)
 			mexErrMsgTxt("Bad file descriptor!");
+
 		poll_items[socket_cnt].socket = NULL;
 		poll_items[socket_cnt].fd = fd;
 		poll_items[socket_cnt].events = ZMQ_POLLIN;
@@ -334,8 +289,16 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 			out[0] = socket_cnt;
 		}
 		socket_cnt++;
-	} else {
-		mexErrMsgTxt("Unrecognized command.");
+	}
+
+	else {
+		mexPrintf("Usage:\n");
+		mexPrintf(" zmq('publish', [endpoint]')\n");
+		mexPrintf(" zmq('subscribe', [endpoint]')\n");
+		mexPrintf(" zmq('poll', [timeout])\n");
+		mexPrintf(" zmq('send', [socket_id], [msg])\n");
+		mexPrintf(" zmq('recv', [socket_id])\n");
+		mexPrintf(" zmq('fd', [fd])\n");
 	}
 
 	mxFree(command);
