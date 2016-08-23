@@ -16,17 +16,17 @@
 #include <stdint.h>
 #include <string.h>
 
-#if defined(_WIN32) || defined(_WIN64) 
-#define snprintf _snprintf 
-#define vsnprintf _vsnprintf 
-#define strcasecmp _stricmp 
-#define strncasecmp _strnicmp 
+#if defined(_WIN32) || defined(_WIN64)
+#define snprintf _snprintf
+#define vsnprintf _vsnprintf
+#define strcasecmp _stricmp
+#define strncasecmp _strnicmp
 #endif
 
 /* 1MB-ish buffer */
 #define BUFLEN 1000000
 /* Do not exceed 255 since indexed by uint8_t */
-#define MAX_SOCKETS 10
+#define MAX_SOCKETS 16
 
 char *command, *protocol, *channel;
 double* port_ptr;
@@ -64,6 +64,11 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]) {
 			mexErrMsgTxt("Could not create zmq context!");
 		}
 		mexPrintf("ZMQMEX: creating a 1 thread ZMQ context.\n");
+
+		/* we don't need 1024 sockets */
+		if (zmq_ctx_set(ctx, ZMQ_MAX_SOCKETS, MAX_SOCKETS) != 0) {
+			mexErrMsgTxt("Could not set max sockets!");
+		}
 
 		recv_buffer = (char*) malloc( BUFLEN );
 		initialized = 1;
