@@ -18,8 +18,6 @@
 #include <unistd.h>
 #endif
 
-/* 1MB-ish buffer */
-#define BUFLEN 1000000
 /* Do not exceed 255 since indexed by uint8_t */
 #define MAX_SOCKETS 16
 
@@ -33,11 +31,9 @@ zmq_pollitem_t poll_items [MAX_SOCKETS];
 uint8_t socket_cnt = 0;
 int rc;
 static int initialized = 0;
-char* recv_buffer;
 
 /* Cleaning up the data */
 void cleanup( void ){
-	free( recv_buffer );
 	mexPrintf("ZMQMEX: closing sockets and context.\n");
 	for(int i=0; i<socket_cnt; i++)
 		zmq_close(sockets[i]);
@@ -62,7 +58,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]) {
 			mexErrMsgTxt("Could not set max sockets!");
 		}
 
-		recv_buffer = (char*) malloc( BUFLEN );
 		initialized = 1;
 		/* 'clear all' and 'clear mex' calls this function */
 		mexAtExit(cleanup);
@@ -254,34 +249,41 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]) {
 			return;
 		}
 
+		zmq_msg_t msg;
+		zmq_msg_init(&msg);
+
 		/* Blocking Receive */
-		int nbytes = zmq_recv(sockets[socket_id], recv_buffer, BUFLEN, 0);
+		int nbytes = zmq_msg_recv(&msg, sockets[socket_id], 0);
 		/* Non-blocking Receive */
-		/*zmq_recv(sockets[socket], recv_buffer, BUFLEN, ZMQ_DONTWAIT);*/
-		if(nbytes==-1)
-			mexErrMsgTxt("Did not receive anything from ZMQ");
+		/*int nbytes = zmq_msg_recv(&msg, sockets[socket], ZMQ_DONTWAIT);*/
+		if(nbytes==-1) {
+			zmq_msg_close(&msg);
+			mexErrMsgTxt("Receive failure!");
+		}
 
 		/* Check if multipart */
-		int has_more;
-		size_t has_more_size = sizeof(has_more);
-		rc = zmq_getsockopt( sockets[socket_id], ZMQ_RCVMORE, 
-				&has_more, &has_more_size );
-		if( rc!=0 )
-			mexErrMsgTxt("Bad ZMQ_RCVMORE call!");
+		int64_t more;
+		size_t more_size = sizeof(more);
+		if (zmq_getsockopt( sockets[socket_id], ZMQ_RCVMORE,
+				&more, &more_size ) != 0) {
+			zmq_msg_close(&msg);
+			mexErrMsgTxt("ZMQ_RCVMORE failure!");
+		}
 
 		/* Output the data to MATLAB */
 		if (nlhs > 0) {
 			mwSize sz = nbytes;
 			plhs[0] = mxCreateNumericArray(1, &sz, mxUINT8_CLASS, mxREAL);
 			void* start = mxGetData(plhs[0]);
-			memcpy(start, recv_buffer, nbytes);
+			memcpy(start, zmq_msg_data(&msg), nbytes);
 		}
 		if (nlhs > 1) {
 			mwSize sz = 1;
 			plhs[1] = mxCreateNumericArray(1, &sz, mxUINT8_CLASS, mxREAL);
 			uint8_t* out = (uint8_t*)mxGetData(plhs[1]);
-			out[0] = (uint8_t)has_more;
+			out[0] = (uint8_t)more;
 		}
+		zmq_msg_close(&msg);
 	}
 
 	/* Poll for data at a specified interval.  Default interval: indefinite */
