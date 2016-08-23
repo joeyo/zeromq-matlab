@@ -296,10 +296,10 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]) {
 		if(rc<0)
 			mexErrMsgTxt("Poll error!");
 
-		/* 
-			 Create a cell mxArray to hold the poll elements, and have an
-			 index array to know which channel received data
-			 */
+		/*
+		Create a cell mxArray to hold the poll elements, and have an
+		index array to know which socket received data
+		*/
 		if (nlhs > 0) {
 			mwSize sz = rc;
 			mxArray* idx_array_ptr =
@@ -313,15 +313,18 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]) {
 			plhs[0] = idx_array_ptr;
 		}
 	}
+
 	/* Add a file descriptor to the polling list (typically udp) */
 	else if(strcasecmp(command, "fd") == 0){
-		if( socket_cnt==MAX_SOCKETS )
-			mexErrMsgTxt("Cannot create any more poll items!");
+		if ( socket_cnt==MAX_SOCKETS )
+			mexErrMsgTxt("Cannot create additional poll items!");
 		if (nrhs != 2)
 			mexErrMsgTxt("Please provide a file descriptor.");
 		if ( !mxIsClass(prhs[1],"uint32") || mxGetNumberOfElements( prhs[1] )!=1 )
 			mexErrMsgTxt("Please provide a valid file descriptor.");
 		uint32_t fd = *( (uint32_t*)mxGetData(prhs[1]) );
+
+		/* cannot be stdin, stdout or stderr */
 		if( fd<3 )
 			mexErrMsgTxt("Bad file descriptor!");
 		poll_items[socket_cnt].socket = NULL;
