@@ -36,9 +36,6 @@ static int initialized = 0;
 mwSize ret_sz[]={1};
 char* recv_buffer;
 
-/* for zmq verion */
-int major, minor, patch;
-
 /* Cleaning up the data */
 void cleanup( void ){
 	free( recv_buffer );
@@ -52,6 +49,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]) {
 
 	/* First run will initialize the context */
 	if (!initialized) {
+		int major, minor, patch;
 		zmq_version(&major, &minor, &patch);
 		mexPrintf("ZMQMEX: using library version %d.%d.%d\n", major, minor, patch);
 
