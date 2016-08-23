@@ -33,7 +33,6 @@ zmq_pollitem_t poll_items [MAX_SOCKETS];
 uint8_t socket_cnt = 0, socket_id;
 int result, rc;
 static int initialized = 0;
-mwSize ret_sz[]={1};
 char* recv_buffer;
 
 /* Cleaning up the data */
@@ -133,12 +132,15 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]) {
 		/* poll_items[socket_cnt].events = ZMQ_POLLOUT; */
 
 		/* MATLAB specific return of the socket ID */
-		ret_sz[0] = 1;
-		plhs[0] = mxCreateNumericArray(1,ret_sz,mxUINT8_CLASS,mxREAL);
-		uint8_t* out = (uint8_t*)mxGetData(plhs[0]);
-		out[0] = socket_cnt;
+		if (nlhs>0) {
+			mwSize sz = 1;
+			plhs[0] = mxCreateNumericArray(1, &sz, mxUINT8_CLASS, mxREAL);
+			uint8_t* out = (uint8_t*)mxGetData(plhs[0]);
+			out[0] = socket_cnt;
+		}
 		socket_cnt++;
 	}
+
 	/* Set up a subscriber */
 	else if( strcmp(command, "subscribe")==0 ){
 
@@ -200,12 +202,15 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]) {
 		poll_items[socket_cnt].events = ZMQ_POLLIN;
 
 		/* MATLAB specific return of the socket ID */
-		ret_sz[0] = 1;
-		plhs[0] = mxCreateNumericArray(1,ret_sz,mxUINT8_CLASS,mxREAL);
-		uint8_t* out = (uint8_t*)mxGetData(plhs[0]);
-		out[0] = socket_cnt;
+		if (nlhs>0) {
+			mwSize sz = 1;
+			plhs[0] = mxCreateNumericArray(1, &sz, mxUINT8_CLASS, mxREAL);
+			uint8_t* out = (uint8_t*)mxGetData(plhs[0]);
+			out[0] = socket_cnt;
+		}
 		socket_cnt++;
 	}
+
 	/* Send data over a socket */
 	else if (strcasecmp(command, "send") == 0){
 		if( nrhs != 3 )
@@ -225,13 +230,15 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]) {
 		/* Check the outcome of the send */
 		if(nbytes!=msglen)
 			mexErrMsgTxt("Did not send correct number of bytes.");
-		if(nlhs>0) {
-			ret_sz[0] = 1;
-			plhs[0] = mxCreateNumericArray(1,ret_sz,mxINT32_CLASS,mxREAL);
+		if (nlhs>0) {
+			mwSize sz = 1;
+			plhs[0] = mxCreateNumericArray(1, &sz, mxINT32_CLASS, mxREAL);
 			int* out = (int*)mxGetData(plhs[0]);
 			out[0] = nbytes;
 		}
-	} else if (strcasecmp(command, "receive") == 0){
+	}
+
+	else if (strcasecmp(command, "receive") == 0){
 		if (nrhs != 2)
 			mexErrMsgTxt("Please provide a socket id.");
 		if ( !mxIsClass(prhs[1],"uint8") || mxGetNumberOfElements( prhs[1] )!=1 )
@@ -242,7 +249,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]) {
 
 		/* If a file descriptor, then return the fd */
 		if( poll_items[socket_id].socket == NULL ){
-			ret_sz[0] = 1;
 			plhs[0] = mxCreateDoubleScalar( poll_items[socket_id].fd );
 			plhs[1] = mxCreateDoubleScalar( 0 );
 			return;
@@ -264,13 +270,20 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]) {
 			mexErrMsgTxt("Bad ZMQ_RCVMORE call!");
 
 		/* Output the data to MATLAB */
-		ret_sz[0] = nbytes;
-		plhs[0] = mxCreateNumericArray(1,ret_sz,mxUINT8_CLASS,mxREAL);
-		void* start = mxGetData( plhs[0] );
-		memcpy(start,recv_buffer,nbytes);
-		/* has_more variable */
-		plhs[1] = mxCreateDoubleScalar( has_more );
+		if (nlhs > 0) {
+			mwSize sz = nbytes;
+			plhs[0] = mxCreateNumericArray(1, &sz, mxUINT8_CLASS, mxREAL);
+			void* start = mxGetData(plhs[0]);
+			memcpy(start, recv_buffer, nbytes);
+		}
+		if (nlhs > 1) {
+			mwSize sz = 1;
+			plhs[1] = mxCreateNumericArray(1, &sz, mxUINT8_CLASS, mxREAL);
+			uint8_t* out = (uint8_t*)mxGetData(plhs[1]);
+			out[0] = (uint8_t)has_more;
+		}
 	}
+
 	/* Poll for data at a specified interval.  Default interval: indefinite */
 	else if (strcasecmp(command, "poll") == 0){
 		long mytimeout = -1;
@@ -287,15 +300,18 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]) {
 			 Create a cell mxArray to hold the poll elements, and have an
 			 index array to know which channel received data
 			 */
-		ret_sz[0] = rc;
-		mxArray* idx_array_ptr = mxCreateNumericArray(1,ret_sz,mxUINT8_CLASS,mxREAL);
-		uint8_t* idx = (uint8_t*)mxGetData(idx_array_ptr);
-		int r = 0;
-		for(int i=0;i<socket_cnt;i++)
-			if(poll_items[i].revents)
-				idx[r++] = i;
-		plhs[0] = idx_array_ptr;
-		return;
+		if (nlhs > 0) {
+			mwSize sz = rc;
+			mxArray* idx_array_ptr =
+				mxCreateNumericArray(1, &sz, mxUINT8_CLASS, mxREAL);
+			uint8_t* idx = (uint8_t*)mxGetData(idx_array_ptr);
+			int r = 0;
+			for (int i=0; i<socket_cnt; i++) {
+				if (poll_items[i].revents)
+					idx[r++] = i;
+			}
+			plhs[0] = idx_array_ptr;
+		}
 	}
 	/* Add a file descriptor to the polling list (typically udp) */
 	else if(strcasecmp(command, "fd") == 0){
@@ -311,10 +327,12 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]) {
 		poll_items[socket_cnt].socket = NULL;
 		poll_items[socket_cnt].fd = fd;
 		poll_items[socket_cnt].events = ZMQ_POLLIN;
-		ret_sz[0] = 1;
-		plhs[0] = mxCreateNumericArray(1,ret_sz,mxUINT8_CLASS,mxREAL);
-		uint8_t* out = (uint8_t*)mxGetData(plhs[0]);
-		out[0] = socket_cnt;
+		if (nlhs > 0) {
+			mwSize sz = 1;
+			plhs[0] = mxCreateNumericArray(1, &sz, mxUINT8_CLASS, mxREAL);
+			uint8_t* out = (uint8_t*)mxGetData(plhs[0]);
+			out[0] = socket_cnt;
+		}
 		socket_cnt++;
 	}
 	else
