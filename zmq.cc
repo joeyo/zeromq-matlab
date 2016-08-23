@@ -40,9 +40,9 @@ char* recv_buffer;
 void cleanup( void ){
 	free( recv_buffer );
 	mexPrintf("ZMQMEX: closing sockets and context.\n");
-	for(int i=0;i<socket_cnt;i++)
-		zmq_close( sockets[i] );
-	zmq_term( ctx );
+	for(int i=0; i<socket_cnt; i++)
+		zmq_close(sockets[i]);
+	zmq_ctx_term(ctx);
 }
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]) {
@@ -53,10 +53,10 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]) {
 		zmq_version(&major, &minor, &patch);
 		mexPrintf("ZMQMEX: using library version %d.%d.%d\n", major, minor, patch);
 
-		if ((ctx = zmq_init(1)) == NULL) {
+		if ((ctx = zmq_ctx_new()) == NULL) {
 			mexErrMsgTxt("Could not create zmq context!");
 		}
-		mexPrintf("ZMQMEX: creating a 1 thread ZMQ context.\n");
+		mexPrintf("ZMQMEX: creating a ZMQ context.\n");
 
 		/* we don't need 1024 sockets */
 		if (zmq_ctx_set(ctx, ZMQ_MAX_SOCKETS, MAX_SOCKETS) != 0) {
